@@ -35,8 +35,10 @@ ensure_certificate() {
 
     command -v openssl >/dev/null 2>&1 || die "openssl is required to create ${CERT_FILE}"
 
-    cert_key="$(mktemp "${CERT_DIR}/server.XXXXXX.key")"
-    cert_crt="$(mktemp "${CERT_DIR}/server.XXXXXX.crt")"
+    cert_key="$(mktemp /tmp/server.XXXXXX.key)"
+    cert_crt="$(mktemp /tmp/server.XXXXXX.crt)"
+
+    chmod 600 "${cert_key}" "${cert_crt}" || die "Failed to update temporary certificate permissions"
 
     trap 'rm -f "${cert_key}" "${cert_crt}"' EXIT HUP INT TERM
 
@@ -55,7 +57,8 @@ ensure_certificate() {
     rm -f "${cert_key}" "${cert_crt}"
     trap - EXIT HUP INT TERM
 
-    chmod 644 "${CERT_FILE}" || die "Failed to update permissions on ${CERT_FILE}"
+    sudo chown "${APP_UID}:${APP_GID}" "${CERT_FILE}" || die "Failed to update ownership on ${CERT_FILE}"
+    chmod 640 "${CERT_FILE}" || die "Failed to update permissions on ${CERT_FILE}"
 }
 
 ensure_data_dir() {
