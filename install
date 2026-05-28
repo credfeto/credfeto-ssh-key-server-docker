@@ -1,0 +1,68 @@
+#!/bin/sh
+
+set -eu
+
+die() {
+    printf '\nERROR: %s\n' "$*" >&2
+    exit 1
+}
+
+success() {
+    printf '\nOK: %s\n' "$*"
+}
+
+info() {
+    printf '\nINFO: %s\n' "$*"
+}
+
+ensure_prerequisites() {
+    command -v docker >/dev/null 2>&1 || die "docker is required"
+    command -v sudo >/dev/null 2>&1 || die "sudo is required"
+}
+
+ensure_data_dir() {
+    info "Ensuring ${DATA_DIR} exists"
+    sudo mkdir -p "${DATA_DIR}" || die "Failed to create ${DATA_DIR}"
+    sudo chown "${APP_UID}:${APP_GID}" "${DATA_DIR}" || die "Failed to update ownership on ${DATA_DIR}"
+    sudo chmod 750 "${DATA_DIR}" || die "Failed to update permissions on ${DATA_DIR}"
+}
+
+ensure_volume() {
+    info "Ensuring ${VOLUME_NAME} docker volume exists"
+
+    if sudo docker volume inspect "${VOLUME_NAME}" >/dev/null 2>&1; then
+        existing_device="$(sudo docker volume inspect --format '{{ index .Options "device" }}' "${VOLUME_NAME}" 2>/dev/null || true)"
+
+        [ "${existing_device}" = "${DATA_DIR}" ] || die "${VOLUME_NAME} exists but is not bound to ${DATA_DIR}"
+
+        return
+    fi
+
+    sudo docker volume create --driver local \
+        --opt type=none \
+        --opt o=bind \
+        --opt device="${DATA_DIR}" \
+        "${VOLUME_NAME}" >/dev/null || die "Failed to create ${VOLUME_NAME} docker volume"
+}
+
+BASEDIR="$(dirname "$(readlink -f "$0")")"
+DATA_DIR="/data/keyserver"
+VOLUME_NAME="keyserver-data"
+APP_UID="1654"
+APP_GID="1654"
+
+info "Script dir: ${BASEDIR}"
+
+cd "${BASEDIR}" || die "Could not change to ${BASEDIR}"
+
+ensure_prerequisites
+ensure_data_dir
+ensure_volume
+
+info "Pulling docker images"
+sudo docker compose pull || die "Failed to pull docker images"
+
+info "Starting docker compose services"
+sudo docker compose up -d || die "Failed to start docker compose services"
+
+success "Install complete"
