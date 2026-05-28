@@ -8,6 +8,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       WATCHTOWER_NOTIFICATIONS_HOSTNAME: ssh-key-server
+      # Watchtower expects this interval in seconds.
       WATCHTOWER_POLL_INTERVAL: 60
 
   ssh-key-server:
