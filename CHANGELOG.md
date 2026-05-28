@@ -11,13 +11,9 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 ## [Unreleased]
 ### Security
 ### Added
-- Added a docker compose deployment for the SSH key server with watchtower plus `install`, `update`, and `reset` helper scripts that manage the external `/data/keyserver` bind-backed volume.
+- Added a docker compose deployment for the SSH key server with watchtower plus `install`, `update`, and `reset` helper scripts that manage the external `/data/keyserver` bind-backed volume and a local self-signed TLS certificate.
 ### Fixed
-- Corrected broken cross-reference in github-workflows.instructions.md — anchor #visual-indicators updated to #output-helpers to match actual section name in shell-scripts.instructions.md
-- shell.firewall.examples.md open_port_for_private_networks no longer calls firewall-cmd --reload internally; added explicit caller-reload rule to shell.firewall.instructions.md
 ### Changed
-- die() must output to stderr so error messages are not swallowed by stdout pipelines
-- SDK - Updated DotNet SDK to 10.0.300
 ### Deprecated
 ### Removed
 ### Deployment Changes
