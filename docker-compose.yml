@@ -27,6 +27,7 @@ services:
       - "${HTTPS_PORT:-8443}:8443"
       - "${HTTPS_PORT:-8443}:8443/udp"
     volumes:
+      # The generated host certificate is mounted here for the non-root container user.
       - ./certs/server.pfx:/https/server.pfx:ro
       - keyserver-data:/var/lib/ssh-key-server/keys
 
