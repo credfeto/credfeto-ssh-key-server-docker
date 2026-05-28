@@ -1,0 +1,26 @@
+---
+services:
+  watchtower:
+    image: nickfedor/watchtower:latest
+    container_name: watchtower
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      WATCHTOWER_NOTIFICATIONS_HOSTNAME: ssh-key-server
+      WATCHTOWER_POLL_INTERVAL: 60
+
+  ssh-key-server:
+    image: ${SSH_KEY_SERVER_IMAGE:-docker-registry.markridgwell.com/credfeto/ssh-key-server:latest}
+    container_name: ssh-key-server
+    hostname: ssh-key-server
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8080}:8080"
+    volumes:
+      - keyserver-data:/var/lib/ssh-key-server/keys
+
+volumes:
+  keyserver-data:
+    external: true
+    name: keyserver-data

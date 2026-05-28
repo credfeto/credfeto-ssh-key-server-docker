@@ -1,0 +1,25 @@
+#!/bin/sh
+
+set -eu
+
+die() {
+    printf '\nERROR: %s\n' "$*" >&2
+    exit 1
+}
+
+info() {
+    printf '\nINFO: %s\n' "$*"
+}
+
+BASEDIR="$(dirname "$(readlink -f "$0")")"
+
+info "Script dir: ${BASEDIR}"
+
+cd "${BASEDIR}" || die "Could not change to ${BASEDIR}"
+
+command -v git >/dev/null 2>&1 || die "git is required"
+
+info "Updating repo"
+git pull --ff-only || die "Failed to pull latest changes"
+
+"${BASEDIR}/install"

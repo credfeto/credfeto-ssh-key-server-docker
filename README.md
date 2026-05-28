@@ -1,24 +1,24 @@
-# cs-template
-C# Template
+# credfeto-ssh-key-server-docker
 
-## Build Status
+Docker compose for the SSH key server.
 
-| Branch  | Status                                                                                                                                                                                                                                |
-|---------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| main    | [![Build: Pre-Release](https://github.com/credfeto/cs-template/actions/workflows/build-and-publish-pre-release.yml/badge.svg)](https://github.com/credfeto/cs-template/actions/workflows/build-and-publish-pre-release.yml) |
-| release | [![Build: Release](https://github.com/credfeto/cs-template/actions/workflows/build-and-publish-release.yml/badge.svg)](https://github.com/credfeto/cs-template/actions/workflows/build-and-publish-release.yml)             |
+## Operations
 
-## Changelog
+Use these scripts from the repository root:
 
-View [changelog](CHANGELOG.md)
+```bash
+./install
+./update
+./reset
+```
 
-## Contributors
+## Runtime data
 
-<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
-<!-- prettier-ignore-start -->
-<!-- markdownlint-disable -->
+- The key server data is stored in `/data/keyserver`.
+- `install` and `update` ensure `/data/keyserver` exists, is owned by UID/GID `1654`, and is mounted into Docker as the external `keyserver-data` volume.
+- The container image defaults to `docker-registry.markridgwell.com/credfeto/ssh-key-server:latest`.
 
-<!-- markdownlint-restore -->
-<!-- prettier-ignore-end -->
+## Network
 
-<!-- ALL-CONTRIBUTORS-LIST:END -->
+- The SSH key server is published on `${PORT:-8080}` and mapped to container port `8080`.
+- Watchtower is included to keep the deployment up-to-date.
