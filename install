@@ -52,7 +52,7 @@ ensure_volume() {
 BASEDIR="$(dirname "$(readlink -f "$0")")"
 DATA_DIR="/data/keyserver"
 VOLUME_NAME="keyserver-data"
-# .NET chiseled runtime images run as the non-root app user (UID/GID 1654).
+# The default key server image uses a non-root runtime user with UID/GID 1654.
 APP_UID="1654"
 APP_GID="1654"
 
