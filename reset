@@ -22,14 +22,8 @@ cd "${BASEDIR}" || die "Could not change to ${BASEDIR}"
 command -v docker >/dev/null 2>&1 || die "docker is required"
 command -v sudo >/dev/null 2>&1 || die "sudo is required"
 
-info "Stopping containers"
-sudo docker compose stop || die "Failed to stop containers"
-
-info "Removing containers"
-sudo docker compose rm -f || die "Failed to remove containers"
-
-info "Pruning Docker system"
-sudo docker system prune -f || die "Failed to prune Docker system"
+info "Removing existing deployment containers"
+sudo docker compose down --remove-orphans || die "Failed to remove docker compose services"
 
 info "Running install"
 "${BASEDIR}/install" || die "Install failed"
