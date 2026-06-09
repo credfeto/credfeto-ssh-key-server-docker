@@ -16,19 +16,12 @@ services:
     container_name: ssh-key-server
     hostname: ssh-key-server
     restart: unless-stopped
-    environment:
-      ASPNETCORE_Kestrel__Endpoints__Http__Protocols: Http1AndHttp2
-      ASPNETCORE_Kestrel__Endpoints__Http__Url: http://+:8080
-      ASPNETCORE_Kestrel__Endpoints__Https__Certificate__Path: /https/server.pfx
-      ASPNETCORE_Kestrel__Endpoints__Https__Protocols: Http1AndHttp2AndHttp3
-      ASPNETCORE_Kestrel__Endpoints__Https__Url: https://+:8443
     ports:
       - "${PORT:-8080}:8080"
       - "${HTTPS_PORT:-8443}:8443"
       - "${HTTPS_PORT:-8443}:8443/udp"
     volumes:
-      # The generated host certificate is mounted here for the non-root container user.
-      - ./certs/server.pfx:/https/server.pfx:ro
+      - ./certs/server.pfx:/usr/src/app/server.pfx:ro
       - keyserver-data:/var/lib/ssh-key-server/keys
 
 volumes:
