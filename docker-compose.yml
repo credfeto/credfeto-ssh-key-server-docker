@@ -18,8 +18,8 @@ services:
     restart: unless-stopped
     ports:
       - "${PORT:-8080}:8080"
-      - "${HTTPS_PORT:-8443}:8443"
-      - "${HTTPS_PORT:-8443}:8443/udp"
+      - "${HTTPS_PORT:-8081}:8081"
+      - "${HTTPS_PORT:-8081}:8081/udp"
     volumes:
       - ./certs/server.pfx:/usr/src/app/server.pfx:ro
       - keyserver-data:/var/lib/ssh-key-server/keys
