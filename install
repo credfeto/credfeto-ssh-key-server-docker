@@ -1,0 +1,125 @@
+#!/bin/sh
+
+set -eu
+
+die() {
+    printf '\n\033[31m✗\033[0m %s\n' "$*" >&2
+    exit 1
+}
+
+success() {
+    printf '\n\033[32m✓\033[0m %s\n' "$*"
+}
+
+info() {
+    printf '\n\033[32m→\033[0m %s\n' "$*"
+}
+
+ensure_prerequisites() {
+    command -v docker >/dev/null 2>&1 || die "docker is required"
+    command -v sudo >/dev/null 2>&1 || die "sudo is required"
+}
+
+ensure_cert_dir() {
+    info "Ensuring ${CERT_DIR} exists"
+    mkdir -p "${CERT_DIR}" || die "Failed to create ${CERT_DIR}"
+    chmod 755 "${CERT_DIR}" || die "Failed to update permissions on ${CERT_DIR}"
+}
+
+ensure_certificate() {
+    info "Ensuring ${CERT_FILE} exists"
+
+    if [ -f "${CERT_FILE}" ]; then
+        return
+    fi
+
+    command -v openssl >/dev/null 2>&1 || die "openssl is required to create ${CERT_FILE}"
+
+    cert_tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/server.XXXXXX")"
+    cert_key="${cert_tmp_dir}/server.key"
+    cert_crt="${cert_tmp_dir}/server.crt"
+
+    trap 'rm -rf "${cert_tmp_dir}"' EXIT HUP INT TERM
+
+    (
+        umask 077
+        openssl req -x509 -newkey rsa:4096 -sha256 -days 3650 -nodes \
+            -subj "/CN=${CERT_CN}" \
+            -addext "subjectAltName=DNS:${CERT_CN},DNS:localhost,IP:127.0.0.1" \
+            -keyout "${cert_key}" \
+            -out "${cert_crt}" >/dev/null 2>&1
+    ) || die "Failed to generate certificate"
+
+    (
+        umask 077
+        openssl pkcs12 -export \
+            -out "${CERT_FILE}" \
+            -inkey "${cert_key}" \
+            -in "${cert_crt}" \
+            -passout pass: >/dev/null 2>&1
+    ) || die "Failed to export ${CERT_FILE}"
+
+    chmod 600 "${CERT_FILE}" || die "Failed to restrict permissions on ${CERT_FILE}"
+
+    rm -rf "${cert_tmp_dir}"
+    trap - EXIT HUP INT TERM
+
+    sudo chown "${APP_UID}:${APP_GID}" "${CERT_FILE}" || die "Failed to update ownership on ${CERT_FILE}"
+}
+
+ensure_data_dir() {
+    info "Ensuring ${DATA_DIR} exists"
+    sudo mkdir -p "${DATA_DIR}" || die "Failed to create ${DATA_DIR}"
+    sudo chown "${APP_UID}:${APP_GID}" "${DATA_DIR}" || die "Failed to update ownership on ${DATA_DIR}"
+    sudo chmod 750 "${DATA_DIR}" || die "Failed to update permissions on ${DATA_DIR}"
+}
+
+get_volume_device() {
+    sudo docker volume inspect --format '{{ index .Options "device" }}' "${VOLUME_NAME}" 2>/dev/null || true
+}
+
+ensure_volume() {
+    info "Ensuring ${VOLUME_NAME} docker volume exists"
+
+    if sudo docker volume inspect "${VOLUME_NAME}" >/dev/null 2>&1; then
+        existing_device="$(get_volume_device)"
+
+        [ "${existing_device}" = "${DATA_DIR}" ] || die "${VOLUME_NAME} exists but is not bound to ${DATA_DIR}"
+
+        return
+    fi
+
+    sudo docker volume create --driver local \
+        --opt type=none \
+        --opt o=bind \
+        --opt device="${DATA_DIR}" \
+        "${VOLUME_NAME}" >/dev/null || die "Failed to create ${VOLUME_NAME} docker volume"
+}
+
+BASEDIR="$(dirname "$(readlink -f "$0")")"
+DATA_DIR="/data/keyserver"
+VOLUME_NAME="keyserver-data"
+CERT_DIR="${BASEDIR}/certs"
+CERT_FILE="${CERT_DIR}/server.pfx"
+CERT_CN="${CERT_CN:-ssh-key-server}"
+# The default key server image uses a non-root runtime user with UID/GID 1654.
+APP_UID="1654"
+APP_GID="1654"
+
+info "Script dir: ${BASEDIR}"
+
+cd "${BASEDIR}" || die "Could not change to ${BASEDIR}"
+
+ensure_prerequisites
+ensure_data_dir
+ensure_cert_dir
+ensure_certificate
+ensure_volume
+
+info "Pulling docker images"
+sudo docker compose pull || die "Failed to pull docker images"
+
+info "Starting docker compose services"
+sudo docker compose up -d || die "Failed to start docker compose services"
+
+success "Install complete"

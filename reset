@@ -1,0 +1,31 @@
+#!/bin/sh
+
+set -eu
+
+die() {
+    printf '\n\033[31m✗\033[0m %s\n' "$*" >&2
+    exit 1
+}
+
+success() {
+    printf '\n\033[32m✓\033[0m %s\n' "$*"
+}
+
+info() {
+    printf '\n\033[32m→\033[0m %s\n' "$*"
+}
+
+BASEDIR="$(dirname "$(readlink -f "$0")")"
+
+cd "${BASEDIR}" || die "Could not change to ${BASEDIR}"
+
+command -v docker >/dev/null 2>&1 || die "docker is required"
+command -v sudo >/dev/null 2>&1 || die "sudo is required"
+
+info "Removing existing deployment containers"
+sudo docker compose down --remove-orphans || die "Failed to remove docker compose services"
+
+info "Running install"
+"${BASEDIR}/install" || die "Install failed"
+
+success "Reset complete"
