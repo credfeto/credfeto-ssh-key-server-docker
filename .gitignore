@@ -195,7 +195,6 @@ ClientBin/
 *.dbmdl
 *.dbproj.schemaview
 *.jfm
-/certs/
 *.pfx
 *.publishsettings
 orleans.codegen.cs
