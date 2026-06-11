@@ -11,6 +11,16 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 ## [Unreleased]
 ### Security
 ### Added
+### Fixed
+### Changed
+### Deprecated
+### Removed
+### Deployment Changes
+<!--
+Releases that have at least been deployed to staging, BUT NOT necessarily released to live.  Changes should be moved from [Unreleased] into here as they are merged into the appropriate release branch
+-->
+## [0.0.1] - 2026-06-11
+### Added
 - Added a docker compose deployment for the SSH key server with watchtower plus `install`, `update`, and `reset` helper scripts that manage the external `/data/keyserver` bind-backed volume and a local self-signed TLS certificate.
 ### Fixed
 - Corrected broken cross-reference in github-workflows.instructions.md — anchor #visual-indicators updated to #output-helpers to match actual section name in shell-scripts.instructions.md
@@ -18,10 +28,5 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 ### Changed
 - die() must output to stderr so error messages are not swallowed by stdout pipelines
 - SDK - Updated DotNet SDK to 10.0.301
-### Deprecated
-### Removed
-### Deployment Changes
-<!--
-Releases that have at least been deployed to staging, BUT NOT necessarily released to live.  Changes should be moved from [Unreleased] into here as they are merged into the appropriate release branch
--->
+
 ## [0.0.0] - Project created
