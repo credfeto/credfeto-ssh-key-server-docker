@@ -20,6 +20,8 @@ services:
       - "${PORT:-8080}:8080"
       - "${HTTPS_PORT:-8081}:8081"
       - "${HTTPS_PORT:-8081}:8081/udp"
+    environment:
+      Challenge__HmacSecret: ${CHALLENGE_HMAC_SECRET:?CHALLENGE_HMAC_SECRET must be set in .env - run ./install}
     volumes:
       - ./certs/server.pfx:/usr/src/app/server.pfx:ro
       - keyserver-data:/var/lib/ssh-key-server/keys

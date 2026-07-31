@@ -25,6 +25,35 @@ ensure_prerequisites() {
     command -v sudo >/dev/null 2>&1 || die "sudo is required"
 }
 
+ensure_env_file() {
+    if [ -f "${ENV_FILE}" ]; then
+        return
+    fi
+
+    info "Creating ${ENV_FILE} with a generated CHALLENGE_HMAC_SECRET"
+
+    command -v openssl >/dev/null 2>&1 || die "openssl is required to create ${ENV_FILE}"
+
+    generated_secret="$(openssl rand -base64 32)" || die "Failed to generate CHALLENGE_HMAC_SECRET"
+
+    (
+        umask 077
+        printf 'CHALLENGE_HMAC_SECRET=%s\n' "${generated_secret}" > "${ENV_FILE}"
+    ) || die "Failed to write ${ENV_FILE}"
+
+    chmod 600 "${ENV_FILE}" || die "Failed to restrict permissions on ${ENV_FILE}"
+}
+
+require_env_file() {
+    [ -f "${ENV_FILE}" ] || die "${ENV_FILE} is missing - run ./install first"
+}
+
+require_hmac_secret() {
+    hmac_secret="$(grep -m1 '^CHALLENGE_HMAC_SECRET=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2-)"
+
+    [ -n "${hmac_secret}" ] || die "CHALLENGE_HMAC_SECRET is not set in ${ENV_FILE}"
+}
+
 allow_ipv4() {
     subnet="$1"
     port="$2"
@@ -149,6 +178,7 @@ ensure_volume() {
 }
 
 BASEDIR="$(dirname "$(readlink -f "$0")")"
+ENV_FILE="${BASEDIR}/.env"
 DATA_DIR="/data/keyserver"
 VOLUME_NAME="keyserver-data"
 CERT_DIR="${BASEDIR}/certs"
@@ -166,6 +196,9 @@ info "Script dir: ${BASEDIR}"
 cd "${BASEDIR}" || die "Could not change to ${BASEDIR}"
 
 ensure_prerequisites
+ensure_env_file
+require_env_file
+require_hmac_secret
 ensure_data_dir
 ensure_cert_dir
 ensure_certificate

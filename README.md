@@ -19,6 +19,12 @@ Use these scripts from the repository root:
 - `install` also creates `certs/server.pfx` locally when it is missing and mounts it into the container for TLS.
 - The container image defaults to `docker-registry.markridgwell.com/credfeto/ssh-key-server:latest`.
 
+## Secrets
+
+- `install` generates a `.env` file (git-ignored) containing `CHALLENGE_HMAC_SECRET`, a random value passed to the container as `Challenge__HmacSecret`, if one does not already exist. It is never overwritten once created.
+- `install` and `update` both refuse to run if `.env` is missing or `CHALLENGE_HMAC_SECRET` is unset — `update` never generates it, so a missing `.env` on an existing deployment means `install` needs to be run first.
+- `docker-compose.yml` requires `CHALLENGE_HMAC_SECRET` to be set and will refuse to start otherwise.
+
 ## Network
 
 - HTTP is published on `${PORT:-8080}` and mapped to container port `8080` for HTTP/1.1 and HTTP/2 cleartext.
