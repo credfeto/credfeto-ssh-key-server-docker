@@ -23,5 +23,5 @@ Use these scripts from the repository root:
 
 - HTTP is published on `${PORT:-8080}` and mapped to container port `8080` for HTTP/1.1 and HTTP/2 cleartext.
 - HTTPS is published on `${HTTPS_PORT:-8081}` and mapped to container port `8081` for HTTP/1.1, HTTP/2, and HTTP/3.
-- Ensure the host firewall allows the configured HTTP and HTTPS ports, including UDP on the HTTPS port for HTTP/3.
+- `install` opens the configured HTTP and HTTPS ports (including UDP on the HTTPS port for HTTP/3) to private networks (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `fc00::/7`, `fe80::/10`) via `firewall-cmd` when `firewalld` is present.
 - Watchtower is included to keep the deployment up-to-date.

@@ -15,9 +15,61 @@ info() {
     printf '\n\033[32m→\033[0m %s\n' "$*"
 }
 
+# shellcheck disable=SC2086 # intentional word splitting over a fixed space-separated list
+IPV4_PRIVATE_RANGES="10.0.0.0/8 172.16.0.0/12 192.168.0.0/16"
+# shellcheck disable=SC2086 # intentional word splitting over a fixed space-separated list
+IPV6_PRIVATE_RANGES="fc00::/7 fe80::/10"
+
 ensure_prerequisites() {
     command -v docker >/dev/null 2>&1 || die "docker is required"
     command -v sudo >/dev/null 2>&1 || die "sudo is required"
+}
+
+allow_ipv4() {
+    subnet="$1"
+    port="$2"
+    protocol="$3"
+    sudo firewall-cmd --permanent \
+        --add-rich-rule="rule family='ipv4' source address='${subnet}' port port='${port}' protocol='${protocol}' accept" \
+        >/dev/null || die "Failed to add ipv4 firewall rule for ${port}/${protocol} from ${subnet}"
+}
+
+allow_ipv6() {
+    subnet="$1"
+    port="$2"
+    protocol="$3"
+    sudo firewall-cmd --permanent \
+        --add-rich-rule="rule family='ipv6' source address='${subnet}' port port='${port}' protocol='${protocol}' accept" \
+        >/dev/null || die "Failed to add ipv6 firewall rule for ${port}/${protocol} from ${subnet}"
+}
+
+open_port_for_private_networks() {
+    port="$1"
+    protocol="$2"
+
+    # shellcheck disable=SC2086 # intentional word splitting over IPV4_PRIVATE_RANGES/IPV6_PRIVATE_RANGES
+    for subnet in ${IPV4_PRIVATE_RANGES}; do
+        allow_ipv4 "${subnet}" "${port}" "${protocol}"
+    done
+
+    # shellcheck disable=SC2086 # intentional word splitting over IPV4_PRIVATE_RANGES/IPV6_PRIVATE_RANGES
+    for subnet in ${IPV6_PRIVATE_RANGES}; do
+        allow_ipv6 "${subnet}" "${port}" "${protocol}"
+    done
+}
+
+ensure_firewall() {
+    if ! command -v firewall-cmd >/dev/null 2>&1; then
+        info "firewalld not present, skipping firewall configuration"
+        return
+    fi
+
+    info "Opening firewall for ${PORT}/tcp and ${HTTPS_PORT}/tcp+udp (private networks only)"
+    open_port_for_private_networks "${PORT}" tcp
+    open_port_for_private_networks "${HTTPS_PORT}" tcp
+    open_port_for_private_networks "${HTTPS_PORT}" udp
+
+    sudo firewall-cmd --reload >/dev/null || die "Failed to reload firewalld"
 }
 
 ensure_cert_dir() {
@@ -105,6 +157,9 @@ CERT_CN="${CERT_CN:-ssh-key-server}"
 # The default key server image uses a non-root runtime user with UID/GID 1654.
 APP_UID="1654"
 APP_GID="1654"
+# Must match the port mappings in docker-compose.yml.
+PORT="${PORT:-8080}"
+HTTPS_PORT="${HTTPS_PORT:-8081}"
 
 info "Script dir: ${BASEDIR}"
 
@@ -115,6 +170,7 @@ ensure_data_dir
 ensure_cert_dir
 ensure_certificate
 ensure_volume
+ensure_firewall
 
 info "Pulling docker images"
 sudo docker compose pull || die "Failed to pull docker images"
