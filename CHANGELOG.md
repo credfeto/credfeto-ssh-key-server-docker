@@ -11,6 +11,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 ## [Unreleased]
 ### Security
 ### Added
+- install now opens the configured HTTP/HTTPS ports (including UDP for HTTP/3) to private networks via firewalld, so the firewall no longer needs configuring by hand
 ### Fixed
 ### Changed
 ### Deprecated
