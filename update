@@ -11,11 +11,25 @@ info() {
     printf '\n\033[32m→\033[0m %s\n' "$*"
 }
 
+require_env_file() {
+    [ -f "${ENV_FILE}" ] || die "${ENV_FILE} is missing - run ./install first"
+}
+
+require_hmac_secret() {
+    hmac_secret="$(grep -m1 '^CHALLENGE_HMAC_SECRET=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2-)"
+
+    [ -n "${hmac_secret}" ] || die "CHALLENGE_HMAC_SECRET is not set in ${ENV_FILE}"
+}
+
 BASEDIR="$(dirname "$(readlink -f "$0")")"
+ENV_FILE="${BASEDIR}/.env"
 
 info "Script dir: ${BASEDIR}"
 
 cd "${BASEDIR}" || die "Could not change to ${BASEDIR}"
+
+require_env_file
+require_hmac_secret
 
 command -v git >/dev/null 2>&1 || die "git is required"
 

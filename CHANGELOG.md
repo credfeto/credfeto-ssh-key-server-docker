@@ -12,6 +12,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 ### Security
 ### Added
 - install now opens the configured HTTP/HTTPS ports (including UDP for HTTP/3) to private networks via firewalld, so the firewall no longer needs configuring by hand
+- install now generates a .env with a random CHALLENGE_HMAC_SECRET when missing, and install/update refuse to run without it, so the key server's Challenge:HmacSecret is always provisioned before the containers start
 ### Fixed
 ### Changed
 ### Deprecated
