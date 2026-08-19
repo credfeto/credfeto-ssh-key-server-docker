@@ -15,6 +15,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 - install now generates a .env with a random CHALLENGE_HMAC_SECRET when missing, and install/update refuse to run without it, so the key server's Challenge:HmacSecret is always provisioned before the containers start
 ### Fixed
 ### Changed
+- SDK - Updated DotNet SDK to 10.0.400
 ### Deprecated
 ### Removed
 ### Deployment Changes
