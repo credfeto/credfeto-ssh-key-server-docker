@@ -11,17 +11,21 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 ## [Unreleased]
 ### Security
 ### Added
-- install now opens the configured HTTP/HTTPS ports (including UDP for HTTP/3) to private networks via firewalld, so the firewall no longer needs configuring by hand
-- install now generates a .env with a random CHALLENGE_HMAC_SECRET when missing, and install/update refuse to run without it, so the key server's Challenge:HmacSecret is always provisioned before the containers start
 ### Fixed
 ### Changed
-- SDK - Updated DotNet SDK to 10.0.400
 ### Deprecated
 ### Removed
 ### Deployment Changes
 <!--
 Releases that have at least been deployed to staging, BUT NOT necessarily released to live.  Changes should be moved from [Unreleased] into here as they are merged into the appropriate release branch
 -->
+## [0.0.3] - 2026-08-20
+### Added
+- install now opens the configured HTTP/HTTPS ports (including UDP for HTTP/3) to private networks via firewalld, so the firewall no longer needs configuring by hand
+- install now generates a .env with a random CHALLENGE_HMAC_SECRET when missing, and install/update refuse to run without it, so the key server's Challenge:HmacSecret is always provisioned before the containers start
+### Changed
+- SDK - Updated DotNet SDK to 10.0.400
+
 ## [0.0.2] - 2026-07-16
 ### Changed
 - SDK - Updated DotNet SDK to 10.0.302
