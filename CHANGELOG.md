@@ -13,15 +13,19 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 ### Added
 ### Fixed
 ### Changed
-- SDK - Updated DotNet SDK to 11.0.100-rc.3.26522.148
 ### Deprecated
 ### Removed
-- Removed src/FunFair.props, which is not permitted outside funfair-tech
 ### Deployment Changes
 
 <!--
 Releases that have at least been deployed to staging, BUT NOT necessarily released to live.  Changes should be moved from [Unreleased] into here as they are merged into the appropriate release branch
 -->
+
+## [0.0.7] - 2026-11-04
+### Changed
+- SDK - Updated DotNet SDK to 11.0.100-rc.3.26522.148
+### Removed
+- Removed src/FunFair.props, which is not permitted outside funfair-tech
 
 ## [0.0.6] - 2026-10-26
 ### Changed
