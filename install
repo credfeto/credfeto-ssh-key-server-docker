@@ -54,6 +54,47 @@ require_hmac_secret() {
     [ -n "${hmac_secret}" ] || die "CHALLENGE_HMAC_SECRET is not set in ${ENV_FILE}"
 }
 
+read_env_setting() {
+    grep -m1 "^$1=" "${ENV_FILE}" 2>/dev/null | cut -d= -f2-
+}
+
+ensure_env_default() {
+    name="$1"
+    value="$2"
+
+    if grep -q "^${name}=" "${ENV_FILE}" 2>/dev/null; then
+        return
+    fi
+
+    info "Adding default ${name} to ${ENV_FILE}"
+
+    # A hand-edited .env may lack a trailing newline, which would merge the appended line into the last one.
+    if [ -s "${ENV_FILE}" ] && [ -n "$(tail -c 1 "${ENV_FILE}")" ]; then
+        printf '\n' >> "${ENV_FILE}" || die "Failed to update ${ENV_FILE}"
+    fi
+
+    printf '%s=%s\n' "${name}" "${value}" >> "${ENV_FILE}" || die "Failed to update ${ENV_FILE}"
+}
+
+ensure_backup_settings() {
+    info "Ensuring backup settings in ${ENV_FILE}"
+
+    BACKUP_SSH_KEY="$(read_env_setting BACKUP_SSH_KEY)"
+    BACKUP_REPO="$(read_env_setting BACKUP_REPO)"
+
+    [ -n "${BACKUP_SSH_KEY}" ] || die "BACKUP_SSH_KEY is not set in ${ENV_FILE} - set it to the path of the backup deploy key"
+    [ -n "${BACKUP_REPO}" ] || die "BACKUP_REPO is not set in ${ENV_FILE} - set it to the backup repository SSH URL"
+    sudo test -f "${BACKUP_SSH_KEY}" || die "BACKUP_SSH_KEY file ${BACKUP_SSH_KEY} does not exist"
+
+    ensure_env_default BACKUP_GIT_NAME "ssh-key-server-backup"
+    ensure_env_default BACKUP_GIT_EMAIL "ssh-key-server-backup@users.noreply.github.com"
+    ensure_env_default BACKUP_INTERVAL_SECONDS "300"
+
+    # The backup sidecar runs as the app UID and ssh rejects keys readable by anyone else.
+    sudo chown "${APP_UID}:${APP_GID}" "${BACKUP_SSH_KEY}" || die "Failed to update ownership on ${BACKUP_SSH_KEY}"
+    sudo chmod 600 "${BACKUP_SSH_KEY}" || die "Failed to update permissions on ${BACKUP_SSH_KEY}"
+}
+
 allow_ipv4() {
     subnet="$1"
     port="$2"
@@ -155,6 +196,38 @@ ensure_data_dir() {
     sudo chmod 750 "${DATA_DIR}" || die "Failed to update permissions on ${DATA_DIR}"
 }
 
+is_data_dir_empty() {
+    [ -z "$(sudo find "${DATA_DIR}" -mindepth 1 -maxdepth 1 -print -quit)" ]
+}
+
+restore_from_backup() {
+    if ! is_data_dir_empty; then
+        return
+    fi
+
+    info "${DATA_DIR} is empty - restoring key data from ${BACKUP_REPO}"
+
+    command -v git >/dev/null 2>&1 || die "git is required to restore ${DATA_DIR} from ${BACKUP_REPO}"
+
+    restore_tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/keyserver-restore.XXXXXX")" || die "Failed to create a temporary directory"
+    restore_repo_dir="${restore_tmp_dir}/repo"
+
+    trap 'sudo rm -rf "${restore_tmp_dir}"' EXIT HUP INT TERM
+
+    # Runs as root because the deploy key is owned by the app UID with mode 600.
+    sudo env GIT_SSH_COMMAND="ssh -i '${BACKUP_SSH_KEY}' -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile='${restore_tmp_dir}/known_hosts'" \
+        git clone -q "${BACKUP_REPO}" "${restore_repo_dir}" || die "Failed to clone ${BACKUP_REPO}"
+
+    sudo rm -rf "${restore_repo_dir}/.git" || die "Failed to remove the clone's git metadata"
+    sudo cp -a "${restore_repo_dir}/." "${DATA_DIR}/" || die "Failed to copy the backup into ${DATA_DIR}"
+    sudo chown -R "${APP_UID}:${APP_GID}" "${DATA_DIR}" || die "Failed to update ownership on ${DATA_DIR}"
+    # cp -a copies the clone directory's own mode onto DATA_DIR.
+    sudo chmod 750 "${DATA_DIR}" || die "Failed to update permissions on ${DATA_DIR}"
+
+    sudo rm -rf "${restore_tmp_dir}"
+    trap - EXIT HUP INT TERM
+}
+
 get_volume_device() {
     sudo docker volume inspect --format '{{ index .Options "device" }}' "${VOLUME_NAME}" 2>/dev/null || true
 }
@@ -199,7 +272,9 @@ ensure_prerequisites
 ensure_env_file
 require_env_file
 require_hmac_secret
+ensure_backup_settings
 ensure_data_dir
+restore_from_backup
 ensure_cert_dir
 ensure_certificate
 ensure_volume
@@ -207,6 +282,9 @@ ensure_firewall
 
 info "Pulling docker images"
 sudo docker compose pull || die "Failed to pull docker images"
+
+info "Building docker images"
+sudo docker compose build --pull || die "Failed to build docker images"
 
 info "Starting docker compose services"
 sudo docker compose up -d || die "Failed to start docker compose services"

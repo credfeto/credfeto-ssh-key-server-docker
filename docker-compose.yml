@@ -26,7 +26,32 @@ services:
       - ./certs/server.pfx:/usr/src/app/server.pfx:ro
       - keyserver-data:/var/lib/ssh-key-server/keys
 
+  git-backup:
+    build: ./git-backup
+    container_name: git-backup
+    restart: unless-stopped
+    user: "1654:1654"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    cpus: 0.5
+    tmpfs:
+      - /tmp
+    environment:
+      BACKUP_REPO: ${BACKUP_REPO:?BACKUP_REPO must be set in .env - run ./install}
+      BACKUP_GIT_NAME: ${BACKUP_GIT_NAME:-ssh-key-server-backup}
+      BACKUP_GIT_EMAIL: ${BACKUP_GIT_EMAIL:-ssh-key-server-backup@users.noreply.github.com}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-300}
+    volumes:
+      - keyserver-data:/data:ro
+      - ${BACKUP_SSH_KEY:?BACKUP_SSH_KEY must be set in .env - run ./install}:/run/secrets/backup_ssh_key:ro
+      - git-backup-work:/work
+
 volumes:
   keyserver-data:
     external: true
     name: keyserver-data
+  git-backup-work:

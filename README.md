@@ -25,6 +25,44 @@ Use these scripts from the repository root:
 - `install` and `update` both refuse to run if `.env` is missing or `CHALLENGE_HMAC_SECRET` is unset — `update` never generates it, so a missing `.env` on an existing deployment means `install` needs to be run first.
 - `docker-compose.yml` requires `CHALLENGE_HMAC_SECRET` to be set and will refuse to start otherwise.
 
+## Backup
+
+The `git-backup` sidecar backs up the key data to a private GitHub repository using a deploy key.
+
+### Setup
+
+1. Create a private GitHub repository to hold the backup.
+2. Generate a dedicated SSH key pair, for example `ssh-keygen -t ed25519 -N '' -f ~/.ssh/ssh-key-server-backup`.
+3. Add the public key to the repository as a deploy key with write access.
+4. Run `./install` once on a fresh checkout: it creates `.env` and then stops because the backup settings are missing.
+5. Add the settings below to `.env`, then run `./install` again.
+
+| Variable                  | Required | Default                                          | Description                                          |
+|---------------------------|----------|--------------------------------------------------|------------------------------------------------------|
+| `BACKUP_SSH_KEY`          | Yes      |                                                  | Path on the host to the deploy key's private key.    |
+| `BACKUP_REPO`             | Yes      |                                                  | SSH URL of the backup repository.                    |
+| `BACKUP_GIT_NAME`         | No       | `ssh-key-server-backup`                          | Author name of the backup commits.                   |
+| `BACKUP_GIT_EMAIL`        | No       | `ssh-key-server-backup@users.noreply.github.com` | Author email of the backup commits.                  |
+| `BACKUP_INTERVAL_SECONDS` | No       | `300`                                            | Seconds between backup rounds.                       |
+
+- `install` refuses to run if `BACKUP_SSH_KEY` or `BACKUP_REPO` is missing or the key file does not exist, and adds the defaults for the optional settings to `.env`.
+- `docker-compose.yml` requires `BACKUP_SSH_KEY` and `BACKUP_REPO` and will refuse to start otherwise.
+- The key must be readable by UID `1654`, which the sidecar runs as: `install` sets its owner to UID/GID `1654` and its mode to `600`.
+- The key is mounted read-only into the sidecar and is never copied, logged or built into the image.
+
+### How it works
+
+- The sidecar keeps its own clone of the backup repository in the `git-backup-work` volume, so the key server's data directory never contains any git metadata.
+- The key data volume is mounted read-only into the sidecar, so it cannot modify the live key data.
+- Every `BACKUP_INTERVAL_SECONDS` it copies the key data into its clone, commits only when something changed, rebases onto the remote and pushes. A round with no changes makes no commit and logs nothing.
+- A failed rebase is aborted and retried in the next round.
+- The backup repository's root holds the contents of `/data/keyserver` directly.
+
+### Restore
+
+- When `/data/keyserver` is empty, `install` clones the backup repository with the deploy key and copies its contents (without `.git`) into `/data/keyserver`, owned by UID/GID `1654`. It never touches a data directory that already contains files.
+- To restore by hand, clone the backup repository into a temporary directory, copy its contents (without `.git`) into the empty `/data/keyserver`, and run `sudo chown -R 1654:1654 /data/keyserver`.
+
 ## Network
 
 - HTTP is published on `${PORT:-8080}` and mapped to container port `8080` for HTTP/1.1 and HTTP/2 cleartext.
