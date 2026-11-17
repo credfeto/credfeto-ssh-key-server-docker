@@ -11,6 +11,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 ## [Unreleased]
 ### Security
 ### Added
+- Git backup sidecar that backs up the key data to a GitHub repository using a deploy key (#27)
 ### Fixed
 ### Changed
 ### Deprecated
