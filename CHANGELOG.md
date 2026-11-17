@@ -18,6 +18,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 ### Removed
 - Removed unused .NET src/global.json and template solution src/Credfeto.Template.slnx (and its DotSettings)
 ### Deployment Changes
+- .env now requires BACKUP_SSH_KEY (path to a deploy key with write access) and BACKUP_REPO (SSH URL of a private backup repository); install and docker compose refuse to run without them, and install adds defaults for BACKUP_GIT_NAME, BACKUP_GIT_EMAIL and BACKUP_INTERVAL_SECONDS (#27)
 
 <!--
 Releases that have at least been deployed to staging, BUT NOT necessarily released to live.  Changes should be moved from [Unreleased] into here as they are merged into the appropriate release branch
