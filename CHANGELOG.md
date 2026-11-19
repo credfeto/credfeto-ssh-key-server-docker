@@ -12,7 +12,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 ### Security
 ### Added
 - Git backup sidecar that backs up the key data to a GitHub repository using a deploy key (#27)
-- Scripts add-key, delete-key and list-keys to manage keys using the server CLI in the docker-compose (#29)
+- Added add-key, delete-key and list-keys scripts to add, delete and list the keys held by the key server, running the server's admin CLI in the docker compose container, with README documentation (#29)
 ### Fixed
 ### Changed
 ### Deprecated
