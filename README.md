@@ -10,7 +10,37 @@ Use these scripts from the repository root:
 ./install
 ./update
 ./reset
+./add-key
+./delete-key
+./list-keys
 ```
+
+## Key management
+
+These scripts manage the keys held by the running `ssh-key-server` container. Each one runs the server's admin CLI (`/usr/src/app/Credfeto.Keys.Server`) inside the container with `sudo docker compose exec`, as the container's runtime user (UID/GID `1654`), and requires `docker`, `sudo` and an existing `.env` (run `./install` first).
+
+```bash
+./add-key --host server1 --username alice --key "ssh-ed25519 AAAA... alice@laptop"
+./add-key --host server1 --username alice --key-file ~/.ssh/id_ed25519.pub
+./add-key --host server1 --username alice < ~/.ssh/id_ed25519.pub
+./delete-key --host server1 --username alice --fingerprint SHA256:...
+./delete-key --host server1 --username alice --key "ssh-ed25519 AAAA... alice@laptop"
+./list-keys --host server1
+```
+
+| Script       | Arguments                                                                                    | Description                                                                                                  |
+|--------------|----------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------|
+| `add-key`    | `--host` and `--username` (required); `--key <public key>` or `--key-file <file>` (optional) | Adds a public key. Without `--key` or `--key-file` the key is read from stdin. Only the first line is used.  |
+| `delete-key` | `--host` and `--username` (required); exactly one of `--key` or `--fingerprint`              | Deletes a key, identified by its public key line or its fingerprint.                                         |
+| `list-keys`  | `--host` and `--username` (both optional filters)                                            | Lists the stored keys.                                                                                       |
+
+- Every script accepts `-h` or `--help` to print its usage.
+- Output is whatever the server's CLI prints; the scripts add nothing to it.
+- Exit codes:
+  - `0`: the command succeeded.
+  - `1`: `docker`, `sudo` or `.env` is missing.
+  - `2`: usage error (missing or unknown argument, both `--key` and `--key-file`, both `--key` and `--fingerprint`, or an empty key); the usage is printed to stderr.
+  - Any other code is passed through unchanged from `docker compose exec` and the server's CLI.
 
 ## Runtime data
 
