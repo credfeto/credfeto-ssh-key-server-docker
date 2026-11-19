@@ -1,0 +1,106 @@
+#!/bin/sh
+
+set -eu
+
+die() {
+    printf '\n\033[31m✗\033[0m %s\n' "$*" >&2
+    exit 1
+}
+
+print_usage() {
+    cat <<'USAGE'
+Usage: ./add-key --host <host> --username <username> [--key <public key> | --key-file <file>]
+
+Adds an SSH public key for a user on a host to the key server.
+
+Options:
+  --host <host>          Host the key grants access to (required).
+  --username <username>  User the key belongs to (required).
+  --key <public key>     Public key line, e.g. "ssh-ed25519 AAAA... comment".
+  --key-file <file>      File holding the public key; only its first line is used.
+  -h, --help             Show this help.
+
+When neither --key nor --key-file is given the key is read from the first line of stdin.
+USAGE
+}
+
+usage_error() {
+    printf '%s\n\n' "$*" >&2
+    print_usage >&2
+    exit 2
+}
+
+require_value() {
+    [ "$#" -ge 2 ] || usage_error "$1 requires a value"
+}
+
+host=""
+username=""
+key=""
+key_file=""
+key_given=false
+key_file_given=false
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --host)
+            require_value "$@"
+            host="$2"
+            shift 2
+            ;;
+        --username)
+            require_value "$@"
+            username="$2"
+            shift 2
+            ;;
+        --key)
+            require_value "$@"
+            key="$2"
+            key_given=true
+            shift 2
+            ;;
+        --key-file)
+            require_value "$@"
+            key_file="$2"
+            key_file_given=true
+            shift 2
+            ;;
+        -h | --help)
+            print_usage
+            exit 0
+            ;;
+        *)
+            usage_error "Unknown option: $1"
+            ;;
+    esac
+done
+
+[ -n "${host}" ] || usage_error "--host is required"
+[ -n "${username}" ] || usage_error "--username is required"
+
+if [ "${key_given}" = true ] && [ "${key_file_given}" = true ]; then
+    usage_error "Use either --key or --key-file, not both"
+fi
+
+if [ "${key_file_given}" = true ]; then
+    [ -r "${key_file}" ] || usage_error "Cannot read key file: ${key_file}"
+    IFS= read -r key < "${key_file}" || true
+elif [ "${key_given}" = false ]; then
+    [ ! -t 0 ] || usage_error "No key given: use --key, --key-file or pipe the key on stdin"
+    IFS= read -r key || true
+fi
+
+[ -n "${key}" ] || usage_error "The public key is empty"
+
+BASEDIR="$(dirname "$(readlink -f "$0")")"
+ENV_FILE="${BASEDIR}/.env"
+
+cd "${BASEDIR}" || die "Could not change to ${BASEDIR}"
+
+command -v docker >/dev/null 2>&1 || die "docker is required"
+command -v sudo >/dev/null 2>&1 || die "sudo is required"
+[ -f "${ENV_FILE}" ] || die "${ENV_FILE} is missing - run ./install first"
+
+# The key store refuses files not owned by the server's own UID, so run as the image's runtime user.
+exec sudo docker compose exec -T --user 1654:1654 ssh-key-server \
+    /usr/src/app/Credfeto.Keys.Server add --host "${host}" --username "${username}" --key "${key}"

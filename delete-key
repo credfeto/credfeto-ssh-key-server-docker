@@ -1,0 +1,102 @@
+#!/bin/sh
+
+set -eu
+
+die() {
+    printf '\n\033[31m✗\033[0m %s\n' "$*" >&2
+    exit 1
+}
+
+print_usage() {
+    cat <<'USAGE'
+Usage: ./delete-key --host <host> --username <username> (--key <public key> | --fingerprint <fingerprint>)
+
+Deletes an SSH public key for a user on a host from the key server.
+
+Options:
+  --host <host>                Host the key grants access to (required).
+  --username <username>        User the key belongs to (required).
+  --key <public key>           Public key line to delete.
+  --fingerprint <fingerprint>  Fingerprint of the key to delete, e.g. "SHA256:...".
+  -h, --help                   Show this help.
+
+Exactly one of --key or --fingerprint is required.
+USAGE
+}
+
+usage_error() {
+    printf '%s\n\n' "$*" >&2
+    print_usage >&2
+    exit 2
+}
+
+require_value() {
+    [ "$#" -ge 2 ] || usage_error "$1 requires a value"
+}
+
+host=""
+username=""
+key=""
+fingerprint=""
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --host)
+            require_value "$@"
+            host="$2"
+            shift 2
+            ;;
+        --username)
+            require_value "$@"
+            username="$2"
+            shift 2
+            ;;
+        --key)
+            require_value "$@"
+            key="$2"
+            shift 2
+            ;;
+        --fingerprint)
+            require_value "$@"
+            fingerprint="$2"
+            shift 2
+            ;;
+        -h | --help)
+            print_usage
+            exit 0
+            ;;
+        *)
+            usage_error "Unknown option: $1"
+            ;;
+    esac
+done
+
+[ -n "${host}" ] || usage_error "--host is required"
+[ -n "${username}" ] || usage_error "--username is required"
+
+if [ -n "${key}" ] && [ -n "${fingerprint}" ]; then
+    usage_error "Use either --key or --fingerprint, not both"
+fi
+
+if [ -n "${key}" ]; then
+    selector="--key"
+    selector_value="${key}"
+elif [ -n "${fingerprint}" ]; then
+    selector="--fingerprint"
+    selector_value="${fingerprint}"
+else
+    usage_error "Either --key or --fingerprint is required"
+fi
+
+BASEDIR="$(dirname "$(readlink -f "$0")")"
+ENV_FILE="${BASEDIR}/.env"
+
+cd "${BASEDIR}" || die "Could not change to ${BASEDIR}"
+
+command -v docker >/dev/null 2>&1 || die "docker is required"
+command -v sudo >/dev/null 2>&1 || die "sudo is required"
+[ -f "${ENV_FILE}" ] || die "${ENV_FILE} is missing - run ./install first"
+
+# The key store refuses files not owned by the server's own UID, so run as the image's runtime user.
+exec sudo docker compose exec -T --user 1654:1654 ssh-key-server \
+    /usr/src/app/Credfeto.Keys.Server delete --host "${host}" --username "${username}" "${selector}" "${selector_value}"
