@@ -289,4 +289,11 @@ sudo docker compose build --pull || die "Failed to build docker images"
 info "Starting docker compose services"
 sudo docker compose up -d || die "Failed to start docker compose services"
 
+# Ingress/egress lockdown (nftables + firewalld policies); observation mode
+# unless KEYS_FIREWALL_ENFORCE=true in .env. Runs after the containers exist,
+# because Docker creates the docker zone the policies refer to. See README.md,
+# "Host firewall".
+info "Configuring the host firewall"
+sudo "${BASEDIR}/firewall/configure" || die "Failed to configure the host firewall"
+
 success "Install complete"

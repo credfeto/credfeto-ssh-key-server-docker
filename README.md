@@ -97,5 +97,34 @@ The `git-backup` sidecar backs up the key data to a private GitHub repository us
 
 - HTTP is published on `${PORT:-8080}` and mapped to container port `8080` for HTTP/1.1 and HTTP/2 cleartext.
 - HTTPS is published on `${HTTPS_PORT:-8081}` and mapped to container port `8081` for HTTP/1.1, HTTP/2, and HTTP/3.
-- `install` opens the configured HTTP and HTTPS ports (including UDP on the HTTPS port for HTTP/3) to private networks (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `fc00::/7`, `fe80::/10`) via `firewall-cmd` when `firewalld` is present.
+- `install` opens the configured HTTP and HTTPS ports (including UDP on the HTTPS port for HTTP/3) to private networks (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `fc00::/7`, `fe80::/10`) via `firewall-cmd` when `firewalld` is present. Those zone rules do not filter the published container ports (Docker translates them before firewalld's rules run); the host firewall below does.
 - Watchtower is included to keep the deployment up-to-date.
+
+## Host firewall
+
+`install` (and so `update`) runs `firewall/configure`, which locks the key server down for ingress and egress, the same way as the DNS and monitoring servers:
+
+| Filter                                | Traffic                     | Allowed                                                                                                                                                                       |
+|---------------------------------------|-----------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `key_ingress` (nftables)              | LAN -> published ports      | the HTTP and HTTPS ports (tcp and udp) from the reverse proxies only, since every host's sshd looks keys up through `keys.markridgwell.com`                                     |
+| `key-egress` (firewalld policy)        | host -> anywhere            | DNS to the fleet's DNS servers, NTP to the router, HTTPS to the proxies, journald uploads to monitoring, GitHub, ghcr.io, Docker Hub, Cloudflare, chaotic-aur, pkgstats, the Arch WKD, ICMP |
+| `key-egress-docker` (firewalld policy) | containers -> outside world | DNS, HTTPS to the proxies, GitHub over SSH (git-backup) and HTTPS, ghcr.io, Docker Hub and Cloudflare (Watchtower)                                                           |
+
+SSH to the host is left to the host's base configuration.
+
+Ingress is an nftables table of its own (`firewall/ingress.nft.template`, loaded by `keys-ingress-firewall.service` before Docker starts) because firewalld accepts Docker's translated traffic before its policies run.
+
+Two timers keep it current:
+
+* `keys-egress-refresh.timer` (every 10 minutes) refreshes the firewalld ipsets for destinations without a stable address: names resolved from DNS, plus GitHub's and Cloudflare's published ranges (`firewall/github-egress-ranges` and `firewall/cloudflare-egress-ranges`).
+* `keys-firewall-sync.timer` (every 15 minutes) pulls the checkout and re-runs `firewall/configure` when anything under `firewall/` changed since the commit it last applied. Container changes still wait for `update`.
+
+The `Repo: Update egress ranges` workflow regenerates the two range files daily and commits any change to main, refusing a list that has shrunk by more than a fifth.
+
+`KEYS_FIREWALL_ENFORCE` in `.env` is the only switch. Unset or anything other than `true` is observation mode: every rule is in place, but traffic that matches none of them still flows and is logged with the prefix `key-ingress-unmatched:`, `key-egress-unmatched:` or `key-egress-docker-unmatched:` (rate-limited to 30 a minute). Run in observation mode first and check the journal for anything legitimate that is not covered:
+
+```sh
+sudo journalctl -k --since -1d | grep -E 'key-[a-z-]+-unmatched'
+```
+
+then set `KEYS_FIREWALL_ENFORCE=true` and run `./update`. Every host's SSH logins depend on this server answering the proxies, so check `curl -fsS https://keys.markridgwell.com/ping` from another host straight after enforcing.

@@ -10,6 +10,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 
 ## [Unreleased]
 ### Security
+- Host firewall lockdown for ingress and egress (`firewall/configure`, run by `install`): an nftables table lets only the reverse proxies reach the published key server ports, and firewalld policies limit what the host and the containers may connect to, with CDN-fronted destinations kept in ipsets refreshed every 10 minutes. `keys-firewall-sync.timer` re-applies it when the firewall config changes, and the daily `Repo: Update egress ranges` workflow refreshes the GitHub and Cloudflare ranges. Observation mode (log unmatched traffic, drop nothing) until `KEYS_FIREWALL_ENFORCE=true`
 ### Added
 - Git backup sidecar that backs up the key data to a GitHub repository using a deploy key (#27)
 - Added add-key, delete-key and list-keys scripts to add, delete and list the keys held by the key server, running the server's admin CLI in the docker compose container, with README documentation (#29)
