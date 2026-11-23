@@ -13,8 +13,10 @@ table.
 
 Runs as root from keys-egress-refresh.timer (every 10 minutes), from
 firewall/configure (which ../install runs) and from firewall/sync. Each run:
-  * resolves the CDN-fronted names (falling back to the last good answer for
-    a name that does not resolve right now),
+  * resolves the CDN-fronted names and adds the answers to the addresses
+    seen for that name in the last KEEP_DAYS days (Docker Hub, for one,
+    hands out a different handful of a large pool on every lookup, so the
+    latest answer alone misses the address the daemon was given),
   * reads the published GitHub and Cloudflare ranges,
   * renders the table and loads it only if it differs from what is loaded.
 
@@ -31,12 +33,15 @@ import socket
 import subprocess
 import sys
 import tempfile
+import time
 
 TABLE = "key_egress"
 PREFIX = "key-egress"
 STATE_DIR = "/var/lib/credfeto-ssh-key-server"
 ENFORCE_FILE = os.path.join(STATE_DIR, "egress-enforce")
 CACHE_FILE = os.path.join(STATE_DIR, "egress-resolved.json")
+# How long a resolved address stays allowed after it was last seen.
+KEEP_DAYS = 7
 LOADED_FILE = os.path.join(STATE_DIR, "egress.nft")
 RANGES_DIR = "/usr/local/share/credfeto-ssh-key-server"
 
@@ -108,11 +113,24 @@ def resolve(name):
 
 
 def load_cache():
+    """slug -> {address: last seen (epoch seconds)}.
+
+    Older caches held a plain list of addresses per slug; those count as seen
+    now so nothing is dropped on the first run after an upgrade.
+    """
     try:
         with open(CACHE_FILE) as f:
-            return json.load(f)
+            raw = json.load(f)
     except (OSError, ValueError):
         return {}
+    now = int(time.time())
+    cache = {}
+    for slug, entry in raw.items():
+        if isinstance(entry, list):
+            cache[slug] = {a: now for a in entry}
+        elif isinstance(entry, dict):
+            cache[slug] = {a: int(t) for a, t in entry.items()}
+    return cache
 
 
 def read_ranges(path):
@@ -128,19 +146,22 @@ def read_ranges(path):
 def gather_sets():
     """slug -> (v4 networks, v6 networks)."""
     cache = load_cache()
+    now = int(time.time())
+    oldest = now - KEEP_DAYS * 86400
     resolved = {}
     sets = {}
     for slug, name in DOMAINS.items():
+        seen = {a: t for a, t in cache.get(slug, {}).items() if t >= oldest}
         try:
-            addrs = resolve(name)
+            for a in resolve(name):
+                seen[a] = now
         except OSError as e:
-            addrs = cache.get(slug, [])
-            log(f"{name} did not resolve ({e}); keeping the {len(addrs)} cached address(es)")
-        resolved[slug] = addrs
+            log(f"{name} did not resolve ({e}); keeping the {len(seen)} address(es) seen in the last {KEEP_DAYS} days")
+        resolved[slug] = seen
         # Resolver-supplied 64:ff9b:: answers are dropped by split() and
         # recomputed from the IPv4 answers, so DNS64 state cannot make the
         # sets flap between runs.
-        sets[slug] = split([ipaddress.ip_network(a) for a in addrs])
+        sets[slug] = split([ipaddress.ip_network(a) for a in seen])
     for slug, filename in RANGES.items():
         path = os.path.join(RANGES_DIR, filename)
         try:
