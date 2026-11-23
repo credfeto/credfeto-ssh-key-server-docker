@@ -1,0 +1,63 @@
+---
+name: "Build: git-backup Docker Image"
+"on":
+  push:
+    branches:
+      - main
+    paths:
+      - "git-backup/**/*"
+      - .github/workflows/build-git-backup-docker-image.yml
+  workflow_dispatch:
+
+concurrency:
+  group: "${{github.workflow}}-${{github.ref}}-git-backup-docker-image"
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-git-backup-docker-image:
+    env:
+      APP_OWNER: credfeto
+      APP_NAME: ssh-key-server-git-backup
+      APP_PATH: git-backup
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Check out repo"
+        uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 1
+
+      - name: "Set up Docker Buildx"
+        uses: docker/setup-buildx-action@v4.4.1
+
+      - name: "Docker: Login to GitHub Container Registry"
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{github.actor}}
+          password: ${{github.token}}
+
+      - name: "Docker: Test Build"
+        uses: docker/build-push-action@v7.4.0
+        with:
+          context: ${{github.workspace}}/${{env.APP_PATH}}
+          platforms: linux/amd64
+          load: true
+          tags: |
+            ${{env.APP_OWNER}}/${{env.APP_NAME}}:test
+          provenance: false
+
+      - name: "Docker: Build with tags"
+        uses: docker/build-push-action@v7.4.0
+        with:
+          context: ${{github.workspace}}/${{env.APP_PATH}}
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ghcr.io/${{env.APP_OWNER}}/${{env.APP_NAME}}:latest
+            ghcr.io/${{env.APP_OWNER}}/${{env.APP_NAME}}:${{github.sha}}
+          provenance: false

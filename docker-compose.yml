@@ -27,7 +27,9 @@ services:
       - keyserver-data:/var/lib/ssh-key-server/keys
 
   git-backup:
-    build: ./git-backup
+    # Built and published by .github/workflows/build-git-backup-docker-image.yml
+    # whenever git-backup/ changes, so watchtower can update it like the others.
+    image: ghcr.io/credfeto/ssh-key-server-git-backup:latest
     container_name: git-backup
     restart: unless-stopped
     user: "1654:1654"

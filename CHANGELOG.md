@@ -18,6 +18,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 - Added add-key, delete-key and list-keys scripts to add, delete and list the keys held by the key server, running the server's admin CLI in the docker compose container, with README documentation (#29)
 ### Fixed
 ### Changed
+- The git-backup image is built and published to ghcr.io/credfeto/ssh-key-server-git-backup by a workflow whenever git-backup/ changes, and docker-compose pulls it from there instead of building it locally, so watchtower can update it
 - The host egress firewall is now one nftables table (`inet key_egress`) loaded atomically by `firewall/egress`, instead of firewalld policies and ipsets: the 10-minute refresh reloaded firewalld, and a firewalld killed mid-reload (by the OOM killer) left its block-everything table in place and cut the host off. `firewall/configure` removes the old policies and ipsets with one last reload
 ### Deprecated
 ### Removed

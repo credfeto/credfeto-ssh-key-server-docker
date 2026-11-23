@@ -283,9 +283,6 @@ ensure_firewall
 info "Pulling docker images"
 sudo docker compose pull || die "Failed to pull docker images"
 
-info "Building docker images"
-sudo docker compose build --pull || die "Failed to build docker images"
-
 info "Starting docker compose services"
 sudo docker compose up -d || die "Failed to start docker compose services"
 
