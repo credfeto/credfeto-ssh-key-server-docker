@@ -1,11 +1,11 @@
 [Unit]
-Description=Refresh the key server's dynamic egress firewalld ipsets
+Description=Refresh and load the key server's egress nftables table
 Wants=network-online.target
-After=network-online.target firewalld.service
+After=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/bin/keys-refresh-egress-ipsets
+ExecStart=/usr/local/bin/keys-egress
 ProtectSystem=full
 ProtectHome=true
 NoNewPrivileges=true

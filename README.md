@@ -107,16 +107,16 @@ The `git-backup` sidecar backs up the key data to a private GitHub repository us
 | Filter                                | Traffic                     | Allowed                                                                                                                                                                       |
 |---------------------------------------|-----------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `key_ingress` (nftables)              | LAN -> published ports      | the HTTP and HTTPS ports (tcp and udp) from the reverse proxies only, since every host's sshd looks keys up through `keys.markridgwell.com`                                     |
-| `key-egress` (firewalld policy)        | host -> anywhere            | DNS to the fleet's DNS servers, NTP to the router, HTTPS to the proxies, journald uploads to monitoring, GitHub, ghcr.io, Docker Hub, Cloudflare, chaotic-aur, pkgstats, the Arch WKD, ICMP |
-| `key-egress-docker` (firewalld policy) | containers -> outside world | DNS, HTTPS to the proxies, GitHub over SSH (git-backup) and HTTPS, ghcr.io, Docker Hub and Cloudflare (Watchtower)                                                           |
+| `host_out` (nftables `key_egress`)     | host -> anywhere            | DNS to the fleet's DNS servers, NTP to the router, HTTPS to the proxies, journald uploads to monitoring, GitHub, ghcr.io, Docker Hub, Cloudflare, chaotic-aur, pkgstats, the Arch WKD, ICMP |
+| `docker_fwd` (nftables `key_egress`)   | containers -> outside world | DNS, HTTPS to the proxies, GitHub over SSH (git-backup) and HTTPS, ghcr.io, Docker Hub and Cloudflare (Watchtower)                                                           |
 
 SSH to the host is left to the host's base configuration.
 
-Ingress is an nftables table of its own (`firewall/ingress.nft.template`, loaded by `keys-ingress-firewall.service` before Docker starts) because firewalld accepts Docker's translated traffic before its policies run.
+Ingress is an nftables table of its own (`firewall/ingress.nft.template`, loaded by `keys-ingress-firewall.service` before Docker starts) because firewalld accepts Docker's translated traffic before its policies run. Egress is a table of its own too: the whole table, address sets included, is replaced in a single `nft -f` transaction, so a refresh never makes firewalld reload, and a ruleset that fails to load leaves the previous one in place.
 
 Two timers keep it current:
 
-* `keys-egress-refresh.timer` (every 10 minutes) refreshes the firewalld ipsets for destinations without a stable address: names resolved from DNS, plus GitHub's and Cloudflare's published ranges (`firewall/github-egress-ranges` and `firewall/cloudflare-egress-ranges`).
+* `keys-egress-refresh.timer` (30 seconds after boot, then every 10 minutes) rebuilds the table's address sets for destinations without a stable address: names resolved from DNS (a name that does not resolve keeps its last good addresses), plus GitHub's and Cloudflare's published ranges (`firewall/github-egress-ranges` and `firewall/cloudflare-egress-ranges`). It only loads the table when it differs from the loaded one.
 * `keys-firewall-sync.timer` (every 15 minutes) pulls the checkout and re-runs `firewall/configure` when anything under `firewall/` changed since the commit it last applied. Container changes still wait for `update`.
 
 The `Repo: Update egress ranges` workflow regenerates the two range files daily and commits any change to main, refusing a list that has shrunk by more than a fifth.
@@ -127,4 +127,8 @@ The `Repo: Update egress ranges` workflow regenerates the two range files daily 
 sudo journalctl -k --since -1d | grep -E 'key-[a-z-]+-unmatched'
 ```
 
-then set `KEYS_FIREWALL_ENFORCE=true` and run `./update`. Every host's SSH logins depend on this server answering the proxies, so check `curl -fsS https://keys.markridgwell.com/ping` from another host straight after enforcing.
+then set `KEYS_FIREWALL_ENFORCE=true` and run `./update`. Every host's SSH logins depend on this server answering the proxies, so check `curl -fsS https://keys.markridgwell.com/ping` from another host straight after enforcing. To see the live egress rules:
+
+```sh
+sudo nft list table inet key_egress
+```
