@@ -17,8 +17,10 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 - Git backup sidecar that backs up the key data to a GitHub repository using a deploy key (#27)
 - Added add-key, delete-key and list-keys scripts to add, delete and list the keys held by the key server, running the server's admin CLI in the docker compose container, with README documentation (#29)
 ### Fixed
+- The egress script takes a lock and writes its resolved-address cache to a unique temp file, so the refresh timer and the firewall sync starting together no longer fail with FileNotFoundError over the shared .tmp file
 - Firewall: resolved destinations (Docker Hub, ghcr.io and the other CDN-fronted names) stay allowed for 7 days after they were last seen instead of only the latest DNS answer, so direct Docker Hub pulls when the docker-cache mirror is down are not dropped because the registry answered with a different part of its address pool
 ### Changed
+- All containers use `restart: always` instead of `unless-stopped`, so a container stopped during a reboot or daemon restart is always brought back (an unless-stopped container was left down after a clean reboot)
 - The git-backup image is built and published to ghcr.io/credfeto/ssh-key-server-git-backup by a workflow whenever git-backup/ changes, and docker-compose pulls it from there instead of building it locally, so watchtower can update it
 - The host egress firewall is now one nftables table (`inet key_egress`) loaded atomically by `firewall/egress`, instead of firewalld policies and ipsets: the 10-minute refresh reloaded firewalld, and a firewalld killed mid-reload (by the OOM killer) left its block-everything table in place and cut the host off. `firewall/configure` removes the old policies and ipsets with one last reload
 ### Deprecated
